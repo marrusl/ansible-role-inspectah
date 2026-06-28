@@ -1,0 +1,51 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  tasks:
+    - name: Check inspectah stub is present
+      ansible.builtin.command:
+        cmd: which inspectah
+      register: _verify_inspectah
+      changed_when: false
+
+    - name: Assert inspectah found
+      ansible.builtin.assert:
+        that:
+          - _verify_inspectah.rc == 0
+        fail_msg: "inspectah binary not found after converge"
+
+    - name: Check scan result was registered
+      ansible.builtin.assert:
+        that:
+          - inspectah_scan_result is defined
+          - inspectah_scan_result.rc == 0
+        fail_msg: "inspectah_scan_result not registered or scan failed"
+
+    - name: Verify tarball was fetched to control node
+      ansible.builtin.stat:
+        path: "{{ playbook_dir }}/scans/molecule-test/inspectah-test-el9.tar.gz"
+      register: _verify_tarball
+      delegate_to: localhost
+
+    - name: Assert tarball exists on control node
+      ansible.builtin.assert:
+        that:
+          - _verify_tarball.stat.exists
+        fail_msg: >-
+          Fetched tarball not found at expected path. Campaign-scoped
+          fetch may have failed.
+      delegate_to: localhost
+
+    - name: Verify tarball was cleaned from target (default behavior)
+      ansible.builtin.stat:
+        path: "/var/lib/inspectah/scans/inspectah-test-el9.tar.gz"
+      register: _verify_target_tarball
+
+    - name: Assert target tarball was removed
+      ansible.builtin.assert:
+        that:
+          - not _verify_target_tarball.stat.exists
+        fail_msg: >-
+          Target tarball still present. cleanup_host_tarball should
+          have removed it after fetch.

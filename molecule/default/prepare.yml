@@ -1,0 +1,56 @@
+---
+- name: Prepare test environment
+  hosts: all
+  become: true
+  tasks:
+    - name: Install test dependencies
+      ansible.builtin.dnf:
+        name:
+          - util-linux
+          - podman
+        state: present
+
+    - name: Create stub inspectah binary
+      ansible.builtin.copy:
+        dest: /usr/local/bin/inspectah
+        mode: "0755"
+        content: |
+          #!/bin/bash
+          # Stub inspectah for Molecule testing.
+          # Supports --version and scan subcommands.
+          case "$1" in
+            --version|version)
+              echo "inspectah 0.8.6"
+              exit 0
+              ;;
+            scan)
+              # Parse -o flag to find output path
+              OUTPUT=""
+              while [[ $# -gt 0 ]]; do
+                case "$1" in
+                  -o|--output)
+                    OUTPUT="$2"
+                    shift 2
+                    ;;
+                  *)
+                    shift
+                    ;;
+                esac
+              done
+              if [[ -n "$OUTPUT" ]]; then
+                mkdir -p "$(dirname "$OUTPUT")"
+                echo "stub-scan-data" | tar czf "$OUTPUT" --files-from=/dev/null 2>/dev/null
+                # Create a minimal valid tarball
+                touch "$OUTPUT"
+                echo '{"host": "test", "timestamp": "2026-01-01T00:00:00Z"}' > /tmp/_inspectah_stub.json
+                tar czf "$OUTPUT" -C /tmp _inspectah_stub.json
+                rm -f /tmp/_inspectah_stub.json
+              fi
+              echo "Scan complete (stub)"
+              exit 0
+              ;;
+            *)
+              echo "inspectah stub: unknown command $1"
+              exit 1
+              ;;
+          esac
