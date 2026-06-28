@@ -1,0 +1,20 @@
+---
+# Air-gapped / RPM push example.
+# Use this when targets cannot reach COPR (air-gapped, restricted networks).
+#
+# Prerequisites:
+#   - The RPM at inspectah_rpm_path has been independently verified
+#     for provenance (checksum, signature, build source).
+#   - The role does NOT verify RPM provenance — that is the operator's
+#     responsibility.
+
+- name: Scan fleet hosts (RPM install)
+  hosts: scan_targets
+  become: false
+  roles:
+    - role: ansible-role-inspectah
+      vars:
+        inspectah_install: true
+        inspectah_install_method: rpm
+        inspectah_rpm_path: "/path/to/inspectah-0.8.6-1.el9.x86_64.rpm"
+        inspectah_cleanup_host: true

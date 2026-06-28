@@ -1,0 +1,25 @@
+---
+# Scan-only playbook — fetch tarballs without aggregating.
+# Use this to collect snapshots for later analysis or transfer
+# to another machine for aggregate processing.
+
+- name: Initialize campaign
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Generate campaign ID
+      ansible.builtin.set_fact:
+        inspectah_campaign_id: "{{ lookup('pipe', 'date +%Y%m%dT%H%M%S') }}"
+
+- name: Scan fleet hosts
+  hosts: scan_targets
+  # serial: 10
+  # max_fail_percentage: 10
+  become: false
+  vars:
+    inspectah_campaign_id: "{{ hostvars['localhost'].inspectah_campaign_id }}"
+  roles:
+    - role: ansible-role-inspectah
+      vars:
+        inspectah_install: true
+        inspectah_install_method: copr

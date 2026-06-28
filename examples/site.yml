@@ -1,0 +1,114 @@
+---
+# Full inspectah fleet scan pipeline.
+#
+# Three-play structure:
+#   Play 0: Generate a campaign ID on localhost (runs exactly once)
+#   Play 1: Scan the fleet (serial batching is safe — campaign ID
+#           comes from Play 0, not run_once)
+#   Play 2: Aggregate results on localhost
+#
+# Why three plays instead of two?
+#   Ansible's run_once fires once per serial BATCH, not once per
+#   play. With serial: 10 and 50 hosts, run_once in Play 1 fires
+#   5 times — creating 5 campaign directories and splitting tarballs
+#   across them. set_fact on localhost in a separate play is truly
+#   play-scoped: it runs exactly once before serial batching begins,
+#   and all batches read the same value from hostvars['localhost'].
+#
+# Fleet-scale tuning (Play 1):
+#   serial: 10          — process 10 hosts at a time to avoid
+#                          thundering herd on base image pulls
+#   max_fail_percentage: 10  — tolerate up to 10% host failures
+#                                without aborting the campaign
+
+# Play 0: Generate campaign ID (truly once, before any serial batching)
+- name: Initialize campaign
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Generate campaign ID
+      ansible.builtin.set_fact:
+        inspectah_campaign_id: "{{ lookup('pipe', 'date +%Y%m%dT%H%M%S') }}"
+
+# Play 1: Scan the fleet
+- name: Scan fleet hosts
+  hosts: scan_targets
+  # serial: 10
+  # max_fail_percentage: 10
+  become: false
+  vars:
+    inspectah_campaign_id: "{{ hostvars['localhost'].inspectah_campaign_id }}"
+  roles:
+    - role: ansible-role-inspectah
+      vars:
+        inspectah_install: true
+        inspectah_install_method: copr
+        # inspectah_install_version: "0.8.6~beta.5"
+        # inspectah_base_image: "registry.redhat.io/rhel9/rhel-bootc:9.6"
+        # inspectah_preserve:
+        #   - subscription
+        # inspectah_cleanup_host: true
+
+# Play 2: Aggregate on control node
+- name: Aggregate scan results
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    _inspectah_min_version: "0.8.0"
+    _aggregate_input: "{{ playbook_dir }}/scans/{{ inspectah_campaign_id }}"
+    _aggregate_output: "{{ playbook_dir }}/aggregate"
+  tasks:
+    - name: Check localhost inspectah version
+      ansible.builtin.command:
+        argv:
+          - inspectah
+          - --version
+      register: _localhost_inspectah_version
+      changed_when: false
+
+    - name: Assert localhost inspectah meets minimum version
+      ansible.builtin.assert:
+        that:
+          - >-
+            _localhost_inspectah_version.stdout
+            | regex_search('[0-9]+\.[0-9]+\.[0-9]+')
+            is version(_inspectah_min_version, '>=')
+        fail_msg: >-
+          localhost inspectah version
+          {{ _localhost_inspectah_version.stdout }} is below the
+          minimum required {{ _inspectah_min_version }}. Upgrade
+          inspectah on the control node before running aggregate.
+
+    - name: Verify campaign directory exists
+      ansible.builtin.stat:
+        path: "{{ _aggregate_input }}"
+      register: _campaign_dir
+
+    - name: Fail if campaign directory missing
+      ansible.builtin.fail:
+        msg: >-
+          Campaign directory {{ _aggregate_input }} not found.
+          Run the scan play first.
+      when: not _campaign_dir.stat.exists
+
+    - name: Ensure aggregate output directory exists
+      ansible.builtin.file:
+        path: "{{ _aggregate_output }}"
+        state: directory
+        mode: "0755"
+
+    - name: Run inspectah aggregate
+      ansible.builtin.command:
+        argv:
+          - inspectah
+          - aggregate
+          - "{{ _aggregate_input }}"
+          - --output-dir
+          - "{{ _aggregate_output }}"
+          # When scan used --preserve or --no-redaction, aggregate
+          # also needs --ack-sensitive to process sensitive tarballs.
+          # Uncomment the next line if your scan campaign preserved
+          # sensitive data:
+          # - --ack-sensitive
+      changed_when: true
