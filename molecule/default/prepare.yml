@@ -1,4 +1,15 @@
 ---
+# UBI9 minimal does not ship sudo, but the role's tasks use become: true
+# (which defaults to the sudo method). Install it before anything else
+# via raw (no Python or become needed).
+- name: Bootstrap sudo in UBI9 containers
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Install sudo (UBI9 does not include it)
+      ansible.builtin.raw: dnf install -y sudo
+      changed_when: true
+
 - name: Prepare test environment
   hosts: all
   become: true
@@ -12,7 +23,7 @@
 
     - name: Create stub inspectah binary
       ansible.builtin.copy:
-        dest: /usr/local/bin/inspectah
+        dest: /usr/bin/inspectah
         mode: "0755"
         content: |
           #!/bin/bash

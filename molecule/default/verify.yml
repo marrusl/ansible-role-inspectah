@@ -1,7 +1,7 @@
 ---
 - name: Verify
   hosts: all
-  become: true
+  become: false
   tasks:
     - name: Check inspectah stub is present
       ansible.builtin.command:
@@ -34,6 +34,7 @@
       ansible.builtin.stat:
         path: "/var/lib/inspectah/scans/inspectah-test-el9.tar.gz"
       register: _verify_target_tarball
+      become: true
 
     - name: Assert target tarball was removed
       ansible.builtin.assert:

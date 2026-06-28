@@ -1,7 +1,7 @@
 ---
 - name: Verify air-gapped scenario
   hosts: all
-  become: true
+  become: false
   tasks:
     - name: Check inspectah is available
       ansible.builtin.command:

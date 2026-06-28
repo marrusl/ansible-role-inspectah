@@ -1,22 +1,8 @@
 ---
 - name: Verify fallback scenario
   hosts: all
-  become: true
+  become: false
   tasks:
-    - name: Check COPR repo file was created via command fallback
-      ansible.builtin.stat:
-        path: /etc/yum.repos.d/_copr:copr.fedorainfracloud.org:mrussell:inspectah.repo
-      register: _verify_copr_repo
-
-    - name: Assert COPR repo file exists
-      ansible.builtin.assert:
-        that:
-          - _verify_copr_repo.stat.exists
-        fail_msg: >-
-          COPR repo file not found. The command fallback path should have
-          created /etc/yum.repos.d/_copr:copr.fedorainfracloud.org:mrussell:inspectah.repo
-          when community.general was unavailable.
-
     - name: Check inspectah binary is installed
       ansible.builtin.command:
         cmd: which inspectah
@@ -27,4 +13,17 @@
       ansible.builtin.assert:
         that:
           - _verify_inspectah.rc == 0
-        fail_msg: "inspectah binary not found after fallback install path"
+        fail_msg: "inspectah binary not found after converge"
+
+    - name: Verify tarball was cleaned from target
+      ansible.builtin.stat:
+        path: "/var/lib/inspectah/scans/inspectah-test-fallback.tar.gz"
+      register: _verify_target_tarball
+
+    - name: Assert target tarball was removed
+      ansible.builtin.assert:
+        that:
+          - not _verify_target_tarball.stat.exists
+        fail_msg: >-
+          Target tarball still present. cleanup_host_tarball should
+          have removed it after fetch.

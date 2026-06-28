@@ -3,8 +3,7 @@
   hosts: all
   become: false
   vars:
-    inspectah_install: true
-    inspectah_install_method: copr
+    inspectah_install: false
     inspectah_campaign_id: "molecule-test"
     inspectah_cleanup_orphan_containers: true
   roles:

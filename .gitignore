@@ -5,6 +5,7 @@ __pycache__/
 # Molecule
 .molecule/
 .cache/
+**/rpmbuild/
 
 # Ansible
 *.retry
