@@ -1,1 +1,130 @@
 ---
+# ============================================================
+# ansible-role-inspectah default variables
+# All variables are prefixed with inspectah_ to avoid collisions.
+# ============================================================
+
+# --- Installation ---
+
+# Whether to install inspectah as part of the role.
+# Set to true if inspectah is not pre-installed on targets.
+inspectah_install: false
+
+# Installation method: "copr" (COPR repo) or "rpm" (push local RPM).
+#
+# Trust model:
+#   copr — installs from the mrussell/inspectah COPR repository.
+#          dnf handles GPG signature verification via the COPR-managed
+#          repo signing key. Same trust model as any COPR package.
+#   rpm  — copies a local RPM from the control node to the target
+#          and installs it with dnf. The role does NOT verify the
+#          RPM's provenance; the operator is responsible for ensuring
+#          the RPM is authentic. Use this path only for pre-validated
+#          artifacts (air-gapped environments, internal build systems).
+inspectah_install_method: "copr"
+
+# COPR repository identifier. Used when inspectah_install_method is "copr".
+inspectah_copr_repo: "mrussell/inspectah"
+
+# Path to a local .rpm file on the control node.
+# Used when inspectah_install_method is "rpm".
+# The RPM is copied to the target and installed with dnf.
+# NOTE: The role trusts this RPM unconditionally. Ensure provenance
+# before pointing this variable at an artifact.
+inspectah_rpm_path: ""
+
+# Version to install. Empty string means "latest".
+# Example: "0.8.6~beta.5" (use RPM tilde convention)
+# Use this to pin a consistent version across the fleet.
+inspectah_install_version: ""
+
+# --- Scan ---
+
+# Target base image for cross-distro conversion.
+# Example: "registry.redhat.io/rhel9/rhel-bootc:9.6"
+# For fleet consistency, prefer digest-pinned references:
+#   "registry.redhat.io/rhel9/rhel-bootc@sha256:abc123..."
+# Tags can resolve differently across hosts if updated mid-campaign.
+# Leave empty for same-distro assessment (most common).
+inspectah_base_image: ""
+
+# Preserve sensitive data categories in the snapshot.
+# Valid items: password-hashes, ssh-keys, subscription, all
+# Implies --ack-sensitive automatically.
+inspectah_preserve: []
+
+# Skip the redaction phase (secrets remain unmasked in output).
+# Implies --ack-sensitive automatically.
+inspectah_no_redaction: false
+
+# Output file path for the scan tarball on the target host.
+# inspectah's -o flag takes a FILE PATH, not a directory.
+# The role passes this path directly to `inspectah scan -o <path>`.
+# Parent directories are created automatically.
+inspectah_scan_output: "/var/lib/inspectah/scans/{{ inventory_hostname }}.tar.gz"
+
+# Async timeout for the scan task in seconds.
+# Cold scans with large base images may need 15+ minutes.
+inspectah_scan_timeout: 900
+
+# Poll interval in seconds for async scan task.
+inspectah_scan_poll: 30
+
+# Additional scan flags as a list of strings.
+# Example: ["--verbose", "--no-baseline"]
+#
+# SAFETY: The role strips any flags that conflict with its own
+# invariants (-o, --progress, --ack-sensitive, --base-image,
+# --preserve, --no-redaction). These are managed by the role's
+# own variables and must not be overridden. A preflight warning
+# is emitted if conflicting flags are detected.
+inspectah_extra_args: []
+
+# --- Fetch ---
+
+# Campaign identifier for grouping fetched tarballs into a single
+# directory. When set, tarballs are fetched into
+# {{ inspectah_fetch_dest }}/{{ inspectah_campaign_id }}/.
+# When empty (default), tarballs are fetched directly into
+# {{ inspectah_fetch_dest }}/{{ inventory_hostname }}.tar.gz with
+# no campaign subdirectory — suitable for simple single-run scans.
+#
+# The example playbook (examples/site.yml) demonstrates generating
+# a campaign ID in a dedicated Play 0 on localhost and passing it
+# to the role. This is the recommended pattern for fleet scans
+# with serial batching.
+#
+# NOTE: Do not use run_once to generate this value inside the
+# fleet play. In Ansible, run_once fires once per serial batch,
+# not once per play — a fleet run with serial: 10 would split
+# tarballs across multiple campaign directories.
+inspectah_campaign_id: ""
+
+# Base directory on the control node to receive per-host tarballs.
+# When inspectah_campaign_id is set, a subdirectory is created
+# under this path. When empty, tarballs land directly here.
+inspectah_fetch_dest: "{{ playbook_dir }}/scans"
+
+# --- Cleanup ---
+
+# Delete per-host tarball from target after successful fetch.
+inspectah_cleanup_host_tarball: true
+
+# Best-effort sweep of orphan inspectah-baseline-* containers.
+# Cleans up containers left by crash-killed inspectah processes
+# (SIGKILL, OOM-kill, host reboot during scan).
+#
+# WARNING: This sweeps ALL containers matching the inspectah-baseline-
+# prefix. It is NOT safe for hosts running concurrent inspectah scans.
+# Enable only when you are certain no other scan is in flight.
+# inspectah's internal CleanupGuard handles normal cleanup.
+inspectah_cleanup_orphan_containers: false
+
+# Remove inspectah and COPR repo from the target after the campaign.
+# Only acts if inspectah_install is true — the role cleans up what
+# it brought, but never removes pre-existing installs.
+# When enabled:
+#   - Uninstalls the inspectah RPM (if inspectah_install was true)
+#   - Disables/removes the COPR repo (if the role enabled it)
+# When disabled (default): leaves inspectah installed for future scans.
+inspectah_cleanup_host: false

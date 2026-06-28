@@ -1,1 +1,32 @@
 ---
+# Internal constants. Not part of the public API.
+# Do not override these in inventory or playbooks.
+
+# Progress mode forced for non-interactive Ansible execution.
+_inspectah_progress_mode: "flat"
+
+# Container name prefix used by inspectah for baseline containers.
+# Used by the orphan janitor (inspectah_cleanup_orphan_containers).
+_inspectah_baseline_container_prefix: "inspectah-baseline-"
+
+# Minimum inspectah version this role release supports.
+# Preflight compares `inspectah --version` output against this.
+_inspectah_min_version: "0.8.0"
+
+# Flags that inspectah_extra_args must not override.
+# Preflight strips these with a warning if present.
+_inspectah_reserved_flags:
+  - "-o"
+  - "--output"
+  - "--progress"
+  - "--ack-sensitive"
+  - "--acknowledge-sensitive"
+  - "--base-image"
+  - "--preserve"
+  - "--no-redaction"
+
+# Whether this campaign handles sensitive data (auto-derived).
+# True when inspectah_preserve is non-empty or inspectah_no_redaction
+# is true. Used to tighten fetch directory permissions.
+_inspectah_sensitive_campaign: >-
+  {{ (inspectah_preserve | length > 0) or (inspectah_no_redaction | bool) }}
