@@ -1,0 +1,30 @@
+---
+- name: Uninstall inspectah
+  ansible.builtin.dnf:
+    name: inspectah
+    state: absent
+  become: true
+  when: _inspectah_pkg_installed | default(false) | bool
+
+- name: Remove COPR repo
+  ansible.builtin.command:
+    argv:
+      - dnf
+      - copr
+      - disable
+      - "{{ inspectah_copr_repo }}"
+      - --yes
+  become: true
+  when:
+    - _inspectah_copr_enabled | default(false) | bool
+    - inspectah_install_method == "copr"
+  changed_when: true
+
+- name: Remove staged RPM from target
+  ansible.builtin.file:
+    path: /tmp/inspectah.rpm
+    state: absent
+  become: true
+  when:
+    - _inspectah_pkg_installed | default(false) | bool
+    - inspectah_install_method == "rpm"
