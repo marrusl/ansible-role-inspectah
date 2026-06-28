@@ -1,0 +1,301 @@
+---
+- name: Check inspectah binary exists
+  ansible.builtin.command:
+    cmd: which inspectah
+  register: _inspectah_which
+  changed_when: false
+  failed_when: false
+
+- name: Fail if inspectah not found
+  ansible.builtin.fail:
+    msg: >-
+      inspectah binary not found in PATH. Either set inspectah_install: true
+      to have the role install it, or install inspectah manually before
+      running this role. See https://github.com/mrussell/inspectah
+  when: _inspectah_which.rc != 0
+
+- name: Get inspectah version
+  ansible.builtin.command:
+    cmd: inspectah --version
+  register: _inspectah_version_output
+  changed_when: false
+
+- name: Extract inspectah version number
+  ansible.builtin.set_fact:
+    _inspectah_installed_version: >-
+      {{ _inspectah_version_output.stdout
+         | regex_search('[0-9]+\.[0-9]+\.[0-9]+') }}
+
+- name: Validate inspectah version meets minimum
+  ansible.builtin.fail:
+    msg: >-
+      inspectah version {{ _inspectah_installed_version }} is below the
+      minimum required {{ _inspectah_min_version }}. Upgrade inspectah
+      to >= {{ _inspectah_min_version }} before running this role.
+  when: >-
+    _inspectah_installed_version is version(_inspectah_min_version, '<')
+
+- name: Check podman is installed
+  ansible.builtin.command:
+    cmd: podman --version
+  register: _podman_version_output
+  changed_when: false
+  failed_when: false
+
+- name: Fail if podman not found
+  ansible.builtin.fail:
+    msg: >-
+      podman is not installed. inspectah requires podman >= 4.4.
+      Install podman before running this role.
+  when: _podman_version_output.rc != 0
+
+- name: Extract podman version number
+  ansible.builtin.set_fact:
+    _podman_version: >-
+      {{ _podman_version_output.stdout
+         | regex_search('[0-9]+\.[0-9]+\.[0-9]+') }}
+
+- name: Validate podman version meets minimum
+  ansible.builtin.fail:
+    msg: >-
+      podman version {{ _podman_version }} is below the minimum
+      required 4.4. Upgrade podman before running this role.
+  when: _podman_version is version('4.4', '<')
+
+- name: Check nsenter is installed
+  ansible.builtin.command:
+    cmd: which nsenter
+  register: _nsenter_check
+  changed_when: false
+  failed_when: false
+
+- name: Fail if nsenter not found
+  ansible.builtin.fail:
+    msg: >-
+      nsenter not found (provided by util-linux). Install util-linux
+      before running this role.
+  when: _nsenter_check.rc != 0
+
+- name: Fail if not RedHat OS family
+  ansible.builtin.fail:
+    msg: >-
+      Unsupported OS family: {{ ansible_os_family }}.
+      This role supports RHEL, CentOS Stream, Fedora, AlmaLinux,
+      and Rocky Linux. Detected: {{ ansible_distribution }}
+      {{ ansible_distribution_version }} (family: {{ ansible_os_family }}).
+  when: ansible_os_family != 'RedHat'
+
+- name: Fail if architecture is unsupported
+  ansible.builtin.fail:
+    msg: >-
+      Unsupported architecture: {{ ansible_architecture }}.
+      This role supports x86_64 and aarch64. Detected:
+      {{ ansible_distribution }} {{ ansible_distribution_version }}
+      on {{ ansible_architecture }}.
+  when: ansible_architecture not in ['x86_64', 'aarch64']
+
+- name: Reject OracleLinux (not in supported platform matrix)
+  ansible.builtin.fail:
+    msg: >-
+      Unsupported distribution: {{ ansible_distribution }}.
+      OracleLinux is not in the supported platform matrix.
+      Supported distributions: RHEL, CentOS Stream, AlmaLinux,
+      Rocky Linux, and Fedora. Detected: {{ ansible_distribution }}
+      {{ ansible_distribution_version }} on {{ ansible_architecture }}.
+  when: ansible_distribution == 'OracleLinux'
+
+- name: Reject EL7 and older
+  ansible.builtin.fail:
+    msg: >-
+      Unsupported EL version: {{ ansible_distribution }}
+      {{ ansible_distribution_major_version }}. This role requires
+      EL >= 8. Detected: {{ ansible_distribution }}
+      {{ ansible_distribution_version }}.
+  when:
+    - ansible_distribution in ['RedHat', 'CentOS', 'AlmaLinux', 'Rocky']
+    - ansible_distribution_major_version | int < 8
+
+- name: Reject AlmaLinux / Rocky 10+ (not in supported platform matrix)
+  ansible.builtin.fail:
+    msg: >-
+      Unsupported version: {{ ansible_distribution }}
+      {{ ansible_distribution_major_version }}. The supported platform
+      matrix covers AlmaLinux and Rocky Linux versions 8 and 9 only.
+      Detected: {{ ansible_distribution }}
+      {{ ansible_distribution_version }} on {{ ansible_architecture }}.
+  when:
+    - ansible_distribution in ['AlmaLinux', 'Rocky']
+    - ansible_distribution_major_version | int >= 10
+
+- name: Validate Fedora version floor
+  ansible.builtin.fail:
+    msg: >-
+      Unsupported Fedora version: {{ ansible_distribution_major_version }}.
+      This role supports Fedora 40 and later. Detected:
+      {{ ansible_distribution }} {{ ansible_distribution_version }}
+      on {{ ansible_architecture }}.
+  when:
+    - ansible_distribution == 'Fedora'
+    - ansible_distribution_major_version | int < 40
+
+- name: Reject Fedora on aarch64 (not in supported platform matrix)
+  ansible.builtin.fail:
+    msg: >-
+      Unsupported platform: Fedora on aarch64 is not in the supported
+      platform matrix. Fedora is supported on x86_64 only.
+      Detected: {{ ansible_distribution }}
+      {{ ansible_distribution_version }} on {{ ansible_architecture }}.
+  when:
+    - ansible_distribution == 'Fedora'
+    - ansible_architecture == 'aarch64'
+
+- name: Reject CentOS Stream 8 aarch64 (not in supported platform matrix)
+  ansible.builtin.fail:
+    msg: >-
+      Unsupported platform: CentOS Stream 8 on aarch64 is not in the
+      supported platform matrix. CentOS Stream 8 is supported on
+      x86_64 only. Detected: {{ ansible_distribution }}
+      {{ ansible_distribution_version }} on {{ ansible_architecture }}.
+  when:
+    - ansible_distribution == 'CentOS'
+    - ansible_distribution_major_version | int == 8
+    - ansible_architecture == 'aarch64'
+
+- name: Reject CentOS Stream 10 aarch64 (not in supported platform matrix)
+  ansible.builtin.fail:
+    msg: >-
+      Unsupported platform: CentOS Stream 10 on aarch64 is not in the
+      supported platform matrix. CentOS Stream 10 is supported on
+      x86_64 only. Detected: {{ ansible_distribution }}
+      {{ ansible_distribution_version }} on {{ ansible_architecture }}.
+  when:
+    - ansible_distribution == 'CentOS'
+    - ansible_distribution_major_version | int == 10
+    - ansible_architecture == 'aarch64'
+
+# --- Tiered platform advisory warnings ---
+# The hard rejections above enforce the outer boundary per spec
+# Section 8.2. The warnings below inform operators when they are
+# running on a best-effort platform that is NOT CI-gated. The role
+# still runs -- tiers are about CI coverage claims, not runtime
+# rejection. Platforms that are release-blocking or smoke-tested
+# pass silently (no warning).
+
+- name: Warn on RHEL 8 (best-effort, migration target)
+  ansible.builtin.debug:
+    msg: >-
+      NOTE: RHEL {{ ansible_distribution_major_version }} is a
+      best-effort migration target. EL8 hosts are a primary use case
+      for inspectah (migrating to EL9 bootc). Ensure podman >= 4.4 is
+      available (RHEL 8.6+ provides it via the container-tools module
+      stream). The podman version preflight check enforces this.
+      Detected: {{ ansible_distribution }}
+      {{ ansible_distribution_version }} on {{ ansible_architecture }}.
+  when:
+    - ansible_distribution == 'RedHat'
+    - ansible_distribution_major_version | int == 8
+
+- name: Warn on CentOS Stream 8 x86_64 (best-effort, migration target)
+  ansible.builtin.debug:
+    msg: >-
+      NOTE: CentOS Stream {{ ansible_distribution_major_version }} on
+      x86_64 is a best-effort migration target. Ensure podman >= 4.4
+      is available. The podman version preflight check enforces this.
+      Detected: {{ ansible_distribution }}
+      {{ ansible_distribution_version }} on {{ ansible_architecture }}.
+  when:
+    - ansible_distribution == 'CentOS'
+    - ansible_distribution_major_version | int == 8
+
+- name: Warn on AlmaLinux / Rocky 8-9 (best-effort, not CI-gated)
+  ansible.builtin.debug:
+    msg: >-
+      NOTE: {{ ansible_distribution }} is best-effort. The CI matrix
+      covers CentOS Stream and RHEL. As a RHEL rebuild,
+      {{ ansible_distribution }} should work, but it is not validated
+      in CI. Detected: {{ ansible_distribution }}
+      {{ ansible_distribution_version }} on {{ ansible_architecture }}.
+  when:
+    - ansible_distribution in ['AlmaLinux', 'Rocky']
+
+- name: Warn on Fedora x86_64 (best-effort, not CI-gated)
+  ansible.builtin.debug:
+    msg: >-
+      NOTE: Fedora is best-effort. COPR builds are available but
+      Fedora is not CI-gated. Detected: {{ ansible_distribution }}
+      {{ ansible_distribution_version }} on {{ ansible_architecture }}.
+  when:
+    - ansible_distribution == 'Fedora'
+
+# NOTE: No warning for RHEL/CentOS 9 (any arch), RHEL/CentOS 10
+# x86_64 -- these are release-blocking or smoke-tested tiers per
+# spec Section 8.2 and pass silently.
+
+- name: Validate inspectah_base_image format when set
+  ansible.builtin.fail:
+    msg: >-
+      inspectah_base_image is set but does not look like a valid
+      container image reference. Expected format:
+      registry/namespace/image:tag or registry/namespace/image@sha256:...
+      Got: "{{ inspectah_base_image }}"
+  when:
+    - inspectah_base_image | length > 0
+    - inspectah_base_image is not regex('^[a-zA-Z0-9][-a-zA-Z0-9.]*(/[-a-zA-Z0-9._]+)+([:@][-a-zA-Z0-9._:]+)?$')
+
+- name: Validate RPM path is set when install method is rpm
+  ansible.builtin.fail:
+    msg: >-
+      inspectah_install_method is "rpm" but inspectah_rpm_path is empty.
+      Set inspectah_rpm_path to the path of the inspectah RPM on the
+      control node.
+  when:
+    - inspectah_install_method == "rpm"
+    - inspectah_install | bool
+    - inspectah_rpm_path | length == 0
+
+- name: Validate RPM file exists on control node
+  ansible.builtin.stat:
+    path: "{{ inspectah_rpm_path }}"
+  register: _rpm_stat
+  delegate_to: localhost
+  when:
+    - inspectah_install_method == "rpm"
+    - inspectah_install | bool
+    - inspectah_rpm_path | length > 0
+
+- name: Fail if RPM file does not exist
+  ansible.builtin.fail:
+    msg: >-
+      RPM file not found at {{ inspectah_rpm_path }} on the control
+      node. Verify the path is correct.
+  when:
+    - _rpm_stat is defined
+    - _rpm_stat.stat is defined
+    - not _rpm_stat.stat.exists
+
+- name: Ensure scan output parent directory is creatable
+  ansible.builtin.file:
+    path: "{{ inspectah_scan_output | dirname }}"
+    state: directory
+    mode: "0750"
+  become: true
+
+- name: Check for reserved flags in extra_args
+  ansible.builtin.set_fact:
+    _inspectah_conflicting_flags: >-
+      {{ inspectah_extra_args | select('in', _inspectah_reserved_flags) | list }}
+
+- name: Warn about reserved flags in extra_args
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: inspectah_extra_args contains reserved flags that are
+      managed by the role: {{ _inspectah_conflicting_flags | join(', ') }}.
+      These flags have been stripped. Use the role's own variables
+      (inspectah_base_image, inspectah_preserve, inspectah_no_redaction)
+      to control these options.
+  when: _inspectah_conflicting_flags | length > 0
+
+- name: Build safe extra_args with reserved flags stripped
+  ansible.builtin.set_fact:
+    _inspectah_safe_extra_args: >-
+      {{ inspectah_extra_args | reject('in', _inspectah_reserved_flags) | list }}
