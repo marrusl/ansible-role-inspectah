@@ -1,0 +1,6 @@
+---
+- name: Test ansible-role-inspectah
+  hosts: localhost
+  remote_user: root
+  roles:
+    - ansible-role-inspectah

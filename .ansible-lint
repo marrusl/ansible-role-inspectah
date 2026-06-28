@@ -1,0 +1,17 @@
+---
+profile: production
+
+exclude_paths:
+  - .github/
+  - molecule/
+  - .cache/
+
+skip_list: []
+
+warn_list:
+  - experimental
+
+enable_list:
+  - fqcn
+  - no-changed-when
+  - no-jinja-when
