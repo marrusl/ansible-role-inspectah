@@ -1,0 +1,30 @@
+---
+- name: Set fetch directory (with or without campaign scoping)
+  ansible.builtin.set_fact:
+    _inspectah_run_dir: >-
+      {{ (inspectah_campaign_id | default('') | length > 0)
+         | ternary(inspectah_fetch_dest ~ '/' ~ inspectah_campaign_id,
+                   inspectah_fetch_dest) }}
+
+- name: Ensure fetch directory exists on control node
+  ansible.builtin.file:
+    path: "{{ _inspectah_run_dir }}"
+    state: directory
+    mode: "{{ (_inspectah_sensitive_campaign | bool) | ternary('0700', '0755') }}"
+  delegate_to: localhost
+  run_once: true
+
+- name: Fetch tarball to control node
+  ansible.builtin.fetch:
+    src: "{{ inspectah_scan_output }}"
+    dest: "{{ _inspectah_run_dir }}/{{ inventory_hostname }}.tar.gz"
+    flat: true
+    fail_on_missing: true
+  become: true
+
+- name: Remove tarball from target host
+  ansible.builtin.file:
+    path: "{{ inspectah_scan_output }}"
+    state: absent
+  become: true
+  when: inspectah_cleanup_host_tarball | bool
