@@ -1,0 +1,10 @@
+---
+- name: Converge (RPM install path)
+  hosts: all
+  become: false
+  roles:
+    - role: ansible-role-inspectah
+      vars:
+        inspectah_install: true
+        inspectah_install_method: rpm
+        inspectah_rpm_path: "{{ playbook_dir }}/inspectah-stub.rpm"

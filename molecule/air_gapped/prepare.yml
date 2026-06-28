@@ -1,0 +1,103 @@
+---
+- name: Build stub RPM on localhost
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Create rpmbuild directory structure
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ playbook_dir }}/rpmbuild/SPECS"
+        - "{{ playbook_dir }}/rpmbuild/SOURCES"
+        - "{{ playbook_dir }}/rpmbuild/BUILD"
+        - "{{ playbook_dir }}/rpmbuild/RPMS"
+        - "{{ playbook_dir }}/rpmbuild/SRPMS"
+
+    - name: Create stub inspectah script for RPM
+      ansible.builtin.copy:
+        dest: "{{ playbook_dir }}/rpmbuild/SOURCES/inspectah"
+        mode: "0755"
+        content: |
+          #!/bin/bash
+          case "$1" in
+            --version|version)
+              echo "inspectah 0.8.6"
+              exit 0
+              ;;
+            scan)
+              OUTPUT=""
+              while [[ $# -gt 0 ]]; do
+                case "$1" in
+                  -o|--output) OUTPUT="$2"; shift 2 ;;
+                  *) shift ;;
+                esac
+              done
+              if [[ -n "$OUTPUT" ]]; then
+                mkdir -p "$(dirname "$OUTPUT")"
+                echo '{"host":"test"}' > /tmp/_stub.json
+                tar czf "$OUTPUT" -C /tmp _stub.json
+                rm -f /tmp/_stub.json
+              fi
+              exit 0
+              ;;
+            *) exit 1 ;;
+          esac
+
+    - name: Create RPM spec file
+      ansible.builtin.copy:
+        dest: "{{ playbook_dir }}/rpmbuild/SPECS/inspectah.spec"
+        mode: "0644"
+        content: |
+          Name:    inspectah
+          Version: 0.8.6
+          Release: 1.molecule%{?dist}
+          Summary: Stub inspectah for Molecule testing
+          License: MIT
+          Source0: inspectah
+
+          %description
+          Minimal stub RPM for Molecule air-gapped scenario testing.
+
+          %install
+          mkdir -p %{buildroot}/usr/local/bin
+          cp %{SOURCE0} %{buildroot}/usr/local/bin/inspectah
+
+          %files
+          %attr(0755,root,root) /usr/local/bin/inspectah
+
+    - name: Build the stub RPM
+      ansible.builtin.command:
+        argv:
+          - rpmbuild
+          - -bb
+          - --define
+          - "_topdir {{ playbook_dir }}/rpmbuild"
+          - "{{ playbook_dir }}/rpmbuild/SPECS/inspectah.spec"
+      register: _rpmbuild_result
+
+    - name: Find built RPM
+      ansible.builtin.find:
+        paths: "{{ playbook_dir }}/rpmbuild/RPMS"
+        patterns: "inspectah-*.rpm"
+        recurse: true
+      register: _built_rpms
+
+    - name: Copy RPM to scenario directory
+      ansible.builtin.copy:
+        src: "{{ _built_rpms.files[0].path }}"
+        dest: "{{ playbook_dir }}/inspectah-stub.rpm"
+        mode: "0644"
+        remote_src: true
+
+- name: Prepare target with test dependencies
+  hosts: all
+  become: true
+  tasks:
+    - name: Install test dependencies
+      ansible.builtin.dnf:
+        name:
+          - util-linux
+          - podman
+        state: present

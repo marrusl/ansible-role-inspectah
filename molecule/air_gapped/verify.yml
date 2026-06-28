@@ -1,0 +1,23 @@
+---
+- name: Verify air-gapped scenario
+  hosts: all
+  become: true
+  tasks:
+    - name: Check inspectah is available
+      ansible.builtin.command:
+        cmd: inspectah --version
+      register: _verify_version
+      changed_when: false
+
+    - name: Assert inspectah version is reported
+      ansible.builtin.assert:
+        that:
+          - "'0.8' in _verify_version.stdout"
+        fail_msg: "inspectah version check failed in air-gapped scenario"
+
+    - name: Check scan result was registered
+      ansible.builtin.assert:
+        that:
+          - inspectah_scan_result is defined
+          - inspectah_scan_result.rc == 0
+        fail_msg: "Scan result not registered or failed in air-gapped scenario"
