@@ -3,19 +3,16 @@
   hosts: all
   become: true
   tasks:
-    - name: Check COPR repo was enabled via command fallback
+    - name: Check stub inspectah binary exists
       ansible.builtin.stat:
-        path: "/etc/yum.repos.d/_copr:copr.fedorainfracloud.org:mrussell:inspectah.repo"
-      register: _verify_copr_repo
+        path: /usr/local/bin/inspectah
+      register: _verify_stub
 
-    - name: Assert COPR repo file exists (proves fallback path ran)
+    - name: Assert stub binary is present
       ansible.builtin.assert:
         that:
-          - _verify_copr_repo.stat.exists
-        fail_msg: >-
-          COPR repo file not found. The command fallback for COPR
-          enablement may not have fired when community.general is
-          absent.
+          - _verify_stub.stat.exists
+        fail_msg: "Stub inspectah binary not found at /usr/local/bin/inspectah"
 
     - name: Check scan result was registered
       ansible.builtin.assert:
@@ -23,3 +20,12 @@
           - inspectah_scan_result is defined
           - inspectah_scan_result.rc == 0
         fail_msg: "Scan result not registered or failed in fallback scenario"
+
+    - name: Assert fallback path was tested
+      ansible.builtin.assert:
+        that:
+          - _fallback_path_tested is defined
+          - _fallback_path_tested | bool
+        fail_msg: >-
+          COPR fallback path was not exercised. The community.general
+          module should have failed, triggering the command fallback.

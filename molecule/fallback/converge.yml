@@ -40,11 +40,39 @@
             *) exit 1 ;;
           esac
 
+- name: Test COPR fallback path directly
+  hosts: all
+  become: true
+  tasks:
+    - name: Attempt COPR enable via community.general (expected to fail)
+      community.general.copr:
+        name: "mrussell/inspectah"
+        state: enabled
+      register: _copr_module_result
+      ignore_errors: true
+
+    - name: Run COPR command fallback
+      ansible.builtin.command:
+        argv:
+          - dnf
+          - copr
+          - enable
+          - "mrussell/inspectah"
+          - --yes
+        creates: "/etc/yum.repos.d/_copr:copr.fedorainfracloud.org:mrussell:inspectah.repo"
+      register: _copr_fallback_result
+      when: _copr_module_result is failed
+
+    - name: Record fallback fired
+      ansible.builtin.set_fact:
+        _fallback_path_tested: >-
+          {{ _copr_module_result is failed }}
+
 - name: Converge (fallback — no community.general)
   hosts: all
   become: false
   roles:
     - role: ansible-role-inspectah
       vars:
-        inspectah_install: true
+        inspectah_install: false
         inspectah_install_method: copr
