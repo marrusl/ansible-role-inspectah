@@ -1,0 +1,126 @@
+---
+# Play 1: Scan via the role (install, preflight, scan, fetch)
+- name: Real-host smoke test
+  hosts: all
+  become: false
+  vars:
+    _smoke_scan_output: "/tmp/inspectah-smoke-{{ ansible_hostname }}.tar.gz"
+    _smoke_fetch_dest: "/tmp/inspectah-smoke-results"
+  roles:
+    - role: ansible-role-inspectah
+      vars:
+        inspectah_scan_output: "{{ _smoke_scan_output }}"
+        inspectah_fetch_dest: "{{ _smoke_fetch_dest }}"
+        inspectah_cleanup_host_tarball: false
+
+# Play 2: Verify scan and fetch results on target
+- name: Verify smoke test results
+  hosts: all
+  become: true
+  tasks:
+    - name: Verify tarball exists on target
+      ansible.builtin.stat:
+        path: "/tmp/inspectah-smoke-{{ ansible_hostname }}.tar.gz"
+      register: _smoke_tarball
+
+    - name: Assert tarball was produced
+      ansible.builtin.assert:
+        that:
+          - _smoke_tarball.stat.exists
+          - _smoke_tarball.stat.size > 0
+        fail_msg: >-
+          Smoke test failed: scan tarball not found or empty at
+          /tmp/inspectah-smoke-{{ ansible_hostname }}.tar.gz
+
+    - name: Verify tarball is a valid gzip archive
+      ansible.builtin.command:
+        argv:
+          - tar
+          - tzf
+          - "/tmp/inspectah-smoke-{{ ansible_hostname }}.tar.gz"
+      register: _smoke_tarball_contents
+      changed_when: false
+
+    - name: Assert tarball contains expected files
+      ansible.builtin.assert:
+        that:
+          - _smoke_tarball_contents.stdout_lines | length > 0
+        fail_msg: >-
+          Smoke test failed: tarball appears empty or corrupt.
+
+    - name: Verify fetched tarball on control node
+      ansible.builtin.stat:
+        path: "/tmp/inspectah-smoke-results/{{ ansible_hostname }}.tar.gz"
+      delegate_to: localhost
+      register: _smoke_fetched
+
+    - name: Assert fetched tarball exists
+      ansible.builtin.assert:
+        that:
+          - _smoke_fetched.stat.exists
+        fail_msg: >-
+          Smoke test failed: fetched tarball not found on control node.
+
+# Play 3: Aggregate on control node and validate output
+- name: Aggregate and validate output
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    _smoke_fetch_dest: "/tmp/inspectah-smoke-results"
+    _smoke_aggregate_output: "/tmp/inspectah-smoke-aggregate"
+  tasks:
+    - name: Ensure aggregate output directory exists
+      ansible.builtin.file:
+        path: "{{ _smoke_aggregate_output }}"
+        state: directory
+        mode: "0755"
+
+    - name: Run inspectah aggregate
+      ansible.builtin.command:
+        argv:
+          - inspectah
+          - aggregate
+          - "{{ _smoke_fetch_dest }}"
+          - --output-dir
+          - "{{ _smoke_aggregate_output }}"
+      changed_when: true
+
+    - name: Verify aggregate output directory is non-empty
+      ansible.builtin.find:
+        paths: "{{ _smoke_aggregate_output }}"
+        file_type: file
+      register: _smoke_aggregate_files
+
+    - name: Assert aggregate produced output files
+      ansible.builtin.assert:
+        that:
+          - _smoke_aggregate_files.matched > 0
+        fail_msg: >-
+          Smoke test failed: inspectah aggregate produced no output
+          files in {{ _smoke_aggregate_output }}.
+
+# Play 4: Clean up all smoke test artifacts
+- name: Clean up smoke test artifacts on target
+  hosts: all
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Remove scan tarball from target
+      ansible.builtin.file:
+        path: "/tmp/inspectah-smoke-{{ ansible_hostname }}.tar.gz"
+        state: absent
+
+- name: Clean up control node artifacts
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Remove fetched smoke test results
+      ansible.builtin.file:
+        path: "/tmp/inspectah-smoke-results"
+        state: absent
+
+    - name: Remove aggregate output
+      ansible.builtin.file:
+        path: "/tmp/inspectah-smoke-aggregate"
+        state: absent

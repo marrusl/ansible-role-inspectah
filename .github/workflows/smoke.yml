@@ -1,0 +1,63 @@
+---
+name: Real-host smoke test
+
+"on":
+  schedule:
+    # Weekly on Sundays at 03:00 UTC
+    - cron: "0 3 * * 0"
+  workflow_dispatch: {}
+
+jobs:
+  smoke:
+    # Requires a self-hosted runner with:
+    #   - CentOS Stream 9 x86_64 (VM or bare-metal, not a container)
+    #   - podman >= 4.4 installed
+    #   - nsenter (util-linux) installed
+    #   - Network access to COPR (copr.fedorainfracloud.org)
+    #   - Root access (sudo without password)
+    #
+    # This job CANNOT run on GitHub-hosted Ubuntu runners.
+    # It validates gaps that Molecule container tests cannot cover:
+    #   - Real inspectah scan execution (not a stub)
+    #   - Real tarball content (not a dummy)
+    #   - Real container lifecycle (podman storage, base image pull)
+    #   - End-to-end COPR install -> scan -> fetch -> aggregate pipeline
+    runs-on: [self-hosted, centos-stream-9, x86_64]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Ansible dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ansible-core
+
+      - name: Install collection dependencies
+        run: ansible-galaxy collection install -r requirements.yml
+
+      - name: Verify prerequisites
+        run: |
+          echo "--- OS ---"
+          cat /etc/os-release
+          echo "--- Architecture ---"
+          uname -m
+          echo "--- podman ---"
+          podman --version
+          echo "--- nsenter ---"
+          which nsenter
+
+      - name: Run smoke test playbook
+        run: |
+          ansible-playbook tests/smoke.yml \
+            -i "localhost," \
+            -c local \
+            --become \
+            -e inspectah_install=true \
+            -e inspectah_install_method=copr
+        env:
+          ANSIBLE_FORCE_COLOR: "true"
