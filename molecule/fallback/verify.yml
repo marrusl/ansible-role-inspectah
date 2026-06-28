@@ -1,0 +1,25 @@
+---
+- name: Verify fallback scenario
+  hosts: all
+  become: true
+  tasks:
+    - name: Check COPR repo was enabled via command fallback
+      ansible.builtin.stat:
+        path: "/etc/yum.repos.d/_copr:copr.fedorainfracloud.org:mrussell:inspectah.repo"
+      register: _verify_copr_repo
+
+    - name: Assert COPR repo file exists (proves fallback path ran)
+      ansible.builtin.assert:
+        that:
+          - _verify_copr_repo.stat.exists
+        fail_msg: >-
+          COPR repo file not found. The command fallback for COPR
+          enablement may not have fired when community.general is
+          absent.
+
+    - name: Check scan result was registered
+      ansible.builtin.assert:
+        that:
+          - inspectah_scan_result is defined
+          - inspectah_scan_result.rc == 0
+        fail_msg: "Scan result not registered or failed in fallback scenario"

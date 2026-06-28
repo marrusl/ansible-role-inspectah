@@ -1,0 +1,50 @@
+---
+- name: Prepare target with stub binary
+  hosts: all
+  become: true
+  tasks:
+    - name: Install test dependencies
+      ansible.builtin.dnf:
+        name:
+          - util-linux
+          - podman
+        state: present
+
+    - name: Create stub inspectah binary
+      ansible.builtin.copy:
+        dest: /usr/local/bin/inspectah
+        mode: "0755"
+        content: |
+          #!/bin/bash
+          case "$1" in
+            --version|version)
+              echo "inspectah 0.8.6"
+              exit 0
+              ;;
+            scan)
+              OUTPUT=""
+              while [[ $# -gt 0 ]]; do
+                case "$1" in
+                  -o|--output) OUTPUT="$2"; shift 2 ;;
+                  *) shift ;;
+                esac
+              done
+              if [[ -n "$OUTPUT" ]]; then
+                mkdir -p "$(dirname "$OUTPUT")"
+                echo '{"host":"test"}' > /tmp/_stub.json
+                tar czf "$OUTPUT" -C /tmp _stub.json
+                rm -f /tmp/_stub.json
+              fi
+              exit 0
+              ;;
+            *) exit 1 ;;
+          esac
+
+- name: Converge (fallback — no community.general)
+  hosts: all
+  become: false
+  roles:
+    - role: ansible-role-inspectah
+      vars:
+        inspectah_install: true
+        inspectah_install_method: copr
