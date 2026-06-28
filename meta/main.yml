@@ -1,5 +1,7 @@
 ---
 galaxy_info:
+  role_name: inspectah
+  namespace: mrussell
   author: Mark Russell
   description: >-
     Run inspectah migration analysis across a fleet of RHEL, CentOS,

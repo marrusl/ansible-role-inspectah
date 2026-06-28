@@ -10,7 +10,7 @@
       become: true
       register: _inspectah_copr_result
 
-    - name: Record COPR enablement for cleanup tracking
+    - name: Record COPR enablement for cleanup tracking  # noqa: no-handler
       ansible.builtin.set_fact:
         _inspectah_copr_enabled: true
       when: _inspectah_copr_result is changed
@@ -28,7 +28,7 @@
       become: true
       register: _inspectah_copr_fallback_result
 
-    - name: Record COPR enablement for cleanup tracking (fallback)
+    - name: Record COPR enablement for cleanup tracking (fallback)  # noqa: no-handler
       ansible.builtin.set_fact:
         _inspectah_copr_enabled: true
       when: _inspectah_copr_fallback_result is changed
