@@ -1,0 +1,69 @@
+---
+- name: Build scan command argument list
+  ansible.builtin.set_fact:
+    _inspectah_scan_argv: >-
+      {{
+        ['inspectah', 'scan',
+         '-o', inspectah_scan_output,
+         '--progress', _inspectah_progress_mode]
+        + (['--base-image', inspectah_base_image]
+           if inspectah_base_image | length > 0 else [])
+        + (inspectah_preserve | map('regex_replace', '^(.*)$', '--preserve\n\1')
+           | join('\n') | split('\n')
+           if inspectah_preserve | length > 0 else [])
+        + (['--no-redaction']
+           if inspectah_no_redaction | bool else [])
+        + (['--ack-sensitive']
+           if (inspectah_preserve | length > 0) or
+              (inspectah_no_redaction | bool) else [])
+        + _inspectah_safe_extra_args
+      }}
+
+- name: Scan and container cleanup
+  block:
+    - name: Ensure scan output parent directory exists
+      ansible.builtin.file:
+        path: "{{ inspectah_scan_output | dirname }}"
+        state: directory
+        mode: "0750"
+      become: true
+
+    - name: Run inspectah scan
+      ansible.builtin.command:
+        argv: "{{ _inspectah_scan_argv }}"
+      become: true
+      async: "{{ inspectah_scan_timeout }}"
+      poll: "{{ inspectah_scan_poll }}"
+      register: inspectah_scan_result
+      changed_when: inspectah_scan_result.rc == 0
+
+  always:
+    - name: Clean up orphan baseline containers (opt-in)
+      when: inspectah_cleanup_orphan_containers | bool
+      block:
+        - name: List orphan baseline containers
+          ansible.builtin.command:
+            argv:
+              - podman
+              - ps
+              - --all
+              - --filter
+              - "name={{ _inspectah_baseline_container_prefix }}"
+              - --format
+              - "{{ '{{' }}.Names{{ '}}' }}"
+          register: _inspectah_orphan_containers
+          changed_when: false
+          become: true
+          failed_when: false
+
+        - name: Remove orphan baseline containers
+          ansible.builtin.command:
+            argv:
+              - podman
+              - rm
+              - --force
+              - "{{ item }}"
+          loop: "{{ _inspectah_orphan_containers.stdout_lines | default([]) }}"
+          become: true
+          changed_when: true
+          when: _inspectah_orphan_containers.stdout_lines | default([]) | length > 0
