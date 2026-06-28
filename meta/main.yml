@@ -1,1 +1,27 @@
 ---
+galaxy_info:
+  author: Mark Russell
+  description: >-
+    Run inspectah migration analysis across a fleet of RHEL, CentOS,
+    or Fedora hosts. Produces per-host snapshot tarballs ready for
+    aggregate analysis.
+  license: MIT
+  min_ansible_version: "2.14"
+  platforms:
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+        - "10"
+    - name: Fedora
+      versions:
+        - "40"
+        - "41"
+  galaxy_tags:
+    - migration
+    - rhel
+    - bootc
+    - scanning
+    - audit
+
+dependencies: []

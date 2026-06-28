@@ -1,1 +1,150 @@
 ---
+argument_specs:
+  main:
+    short_description: >-
+      Run inspectah scan on target hosts and fetch result tarballs
+      to the control node.
+    description:
+      - >-
+        Optionally installs inspectah via COPR or local RPM, runs
+        a migration scan, fetches the resulting tarball to the
+        control node, and cleans up containers and host artifacts.
+      - >-
+        The role does NOT run inspectah aggregate. See the example
+        playbook for the full scan-fetch-aggregate pipeline.
+    options:
+      inspectah_install:
+        type: bool
+        default: false
+        description: Whether to install inspectah on the target host.
+
+      inspectah_install_method:
+        type: str
+        default: copr
+        choices:
+          - copr
+          - rpm
+        description: >-
+          Installation method. "copr" enables the COPR repo and
+          installs via dnf (GPG-verified). "rpm" copies a local RPM
+          to the target (operator-trusted, no provenance check).
+
+      inspectah_copr_repo:
+        type: str
+        default: mrussell/inspectah
+        description: COPR repository identifier.
+
+      inspectah_rpm_path:
+        type: path
+        default: ""
+        description: >-
+          Path to a local .rpm file on the control node. Required
+          when inspectah_install_method is "rpm". The role does not
+          verify this RPM's provenance.
+
+      inspectah_install_version:
+        type: str
+        default: ""
+        description: >-
+          Specific version to install. Empty means latest. Use to
+          pin a consistent version across the fleet.
+
+      inspectah_base_image:
+        type: str
+        default: ""
+        description: >-
+          Target base image for cross-distro conversion. Leave
+          empty for same-distro assessment. When set, must be a
+          valid container image reference (registry/image:tag or
+          registry/image@sha256:...). Validated at preflight.
+
+      inspectah_preserve:
+        type: list
+        elements: str
+        default: []
+        description: >-
+          Sensitive data categories to preserve in the snapshot.
+        choices:
+          - password-hashes
+          - ssh-keys
+          - subscription
+          - all
+
+      inspectah_no_redaction:
+        type: bool
+        default: false
+        description: >-
+          Skip the redaction phase. Secrets remain unmasked in
+          output. Automatically adds --ack-sensitive.
+
+      inspectah_scan_output:
+        type: str
+        default: "/var/lib/inspectah/scans/{{ inventory_hostname }}.tar.gz"
+        description: >-
+          Output file path for the scan tarball on the target host.
+          inspectah's -o flag takes a file path, not a directory.
+          Parent directories are auto-created.
+
+      inspectah_scan_timeout:
+        type: int
+        default: 900
+        description: >-
+          Async timeout for the scan task in seconds.
+
+      inspectah_scan_poll:
+        type: int
+        default: 30
+        description: >-
+          Poll interval in seconds for the async scan task.
+
+      inspectah_extra_args:
+        type: list
+        elements: str
+        default: []
+        description: >-
+          Additional CLI flags passed to inspectah scan. Must not
+          include -o, --progress, --ack-sensitive, --base-image,
+          --preserve, or --no-redaction (these are managed by the
+          role's own variables and stripped with a warning).
+
+      inspectah_campaign_id:
+        type: str
+        default: ""
+        description: >-
+          Campaign identifier for grouping fetched tarballs. When
+          set, tarballs are fetched into a subdirectory named by
+          this value. When empty (default), tarballs land directly
+          in inspectah_fetch_dest. The example playbook generates
+          this in a separate Play 0 on localhost — do not use
+          run_once inside a serial-batched play (it fires per
+          batch, not per play).
+
+      inspectah_fetch_dest:
+        type: path
+        default: "{{ playbook_dir }}/scans"
+        description: >-
+          Base directory on the control node for fetched tarballs.
+          When inspectah_campaign_id is set, a subdirectory is
+          created under this path.
+
+      inspectah_cleanup_host_tarball:
+        type: bool
+        default: true
+        description: >-
+          Remove the scan tarball from the target host after
+          successful fetch.
+
+      inspectah_cleanup_orphan_containers:
+        type: bool
+        default: false
+        description: >-
+          Best-effort sweep of orphan inspectah-baseline-* containers.
+          NOT safe for concurrent scans. inspectah's internal cleanup
+          handles normal cases; enable only for crash leftovers.
+
+      inspectah_cleanup_host:
+        type: bool
+        default: false
+        description: >-
+          Remove inspectah and COPR repo from the target after the
+          campaign. Only acts when inspectah_install is true.
