@@ -1,37 +1,29 @@
 ---
 # COPR install path
-- name: Install via COPR
+- name: Check if community.general.copr module is available
+  ansible.builtin.command:
+    argv:
+      - ansible-doc
+      - --type
+      - module
+      - community.general.copr
+  delegate_to: localhost
+  register: _inspectah_copr_module_check
+  changed_when: false
+  failed_when: false
   when: inspectah_install_method == "copr"
-  block:
-    - name: Enable COPR repository
-      community.general.copr:
-        name: "{{ inspectah_copr_repo }}"
-        state: enabled
-      become: true
-      register: _inspectah_copr_result
 
-    - name: Record COPR enablement for cleanup tracking  # noqa: no-handler
-      ansible.builtin.set_fact:
-        _inspectah_copr_enabled: true
-      when: _inspectah_copr_result is changed
+- name: Enable COPR repository via community.general
+  ansible.builtin.include_tasks: install_copr_module.yml
+  when:
+    - inspectah_install_method == "copr"
+    - _inspectah_copr_module_check.rc == 0
 
-  rescue:
-    - name: Enable COPR repository (fallback without community.general)
-      ansible.builtin.command:
-        argv:
-          - dnf
-          - copr
-          - enable
-          - "{{ inspectah_copr_repo }}"
-          - --yes
-        creates: "/etc/yum.repos.d/_copr:copr.fedorainfracloud.org:{{ inspectah_copr_repo | replace('/', ':') }}.repo"
-      become: true
-      register: _inspectah_copr_fallback_result
-
-    - name: Record COPR enablement for cleanup tracking (fallback)  # noqa: no-handler
-      ansible.builtin.set_fact:
-        _inspectah_copr_enabled: true
-      when: _inspectah_copr_fallback_result is changed
+- name: Enable COPR repository via command fallback
+  ansible.builtin.include_tasks: install_copr_command.yml
+  when:
+    - inspectah_install_method == "copr"
+    - _inspectah_copr_module_check.rc != 0
 
 - name: Install inspectah package via dnf (COPR, versioned)
   ansible.builtin.dnf:
@@ -68,7 +60,6 @@
       ansible.builtin.dnf:
         name: /tmp/inspectah.rpm
         state: present
-        disable_gpg_check: true
       become: true
       register: _inspectah_rpm_install
 

@@ -1,13 +1,16 @@
 ---
 # Outer gate in main.yml ensures this file only runs when both
 # inspectah_cleanup_host and inspectah_install are true. Individual
-# tasks here are unconditional or gated only on install_method.
+# tasks here consume ownership-tracking facts set by install.yml
+# to only remove what the role itself introduced — never pre-existing
+# installs or repo state.
 
 - name: Uninstall inspectah
   ansible.builtin.dnf:
     name: inspectah
     state: absent
   become: true
+  when: _inspectah_pkg_installed | default(false) | bool
 
 - name: Remove COPR repo
   ansible.builtin.command:
@@ -18,7 +21,9 @@
       - "{{ inspectah_copr_repo }}"
       - --yes
   become: true
-  when: inspectah_install_method == "copr"
+  when:
+    - inspectah_install_method == "copr"
+    - _inspectah_copr_enabled | default(false) | bool
   changed_when: true
 
 - name: Remove staged RPM from target

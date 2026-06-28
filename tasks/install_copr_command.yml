@@ -1,0 +1,20 @@
+---
+# COPR enablement via dnf command fallback.
+# Used when community.general collection is not installed.
+
+- name: Enable COPR repository (command fallback)
+  ansible.builtin.command:
+    argv:
+      - dnf
+      - copr
+      - enable
+      - "{{ inspectah_copr_repo }}"
+      - --yes
+    creates: "/etc/yum.repos.d/_copr:copr.fedorainfracloud.org:{{ inspectah_copr_repo | replace('/', ':') }}.repo"
+  become: true
+  register: _inspectah_copr_fallback_result
+
+- name: Record COPR enablement for cleanup tracking (fallback)  # noqa: no-handler
+  ansible.builtin.set_fact:
+    _inspectah_copr_enabled: true
+  when: _inspectah_copr_fallback_result is changed

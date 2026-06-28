@@ -120,7 +120,7 @@ ansible-galaxy collection install -r requirements.yml
   vars:
     inspectah_campaign_id: "{{ hostvars['localhost'].inspectah_campaign_id }}"
   roles:
-    - role: ansible-role-inspectah
+    - role: inspectah
       vars:
         inspectah_install: true
 

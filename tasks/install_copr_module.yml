@@ -1,0 +1,15 @@
+---
+# COPR enablement via community.general.copr module.
+# Only included when the module is confirmed available at runtime.
+
+- name: Enable COPR repository
+  community.general.copr:
+    name: "{{ inspectah_copr_repo }}"
+    state: enabled
+  become: true
+  register: _inspectah_copr_result
+
+- name: Record COPR enablement for cleanup tracking  # noqa: no-handler
+  ansible.builtin.set_fact:
+    _inspectah_copr_enabled: true
+  when: _inspectah_copr_result is changed

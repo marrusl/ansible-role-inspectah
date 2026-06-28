@@ -8,8 +8,8 @@
          '--progress', _inspectah_progress_mode]
         + (['--base-image', inspectah_base_image]
            if inspectah_base_image | length > 0 else [])
-        + (inspectah_preserve | map('regex_replace', '^(.*)$', '--preserve\n\1')
-           | join('\n') | split('\n')
+        + (inspectah_preserve | map('regex_replace', '^(.+)$', '--preserve')
+           | zip(inspectah_preserve) | map('list') | list | sum(start=[])
            if inspectah_preserve | length > 0 else [])
         + (['--no-redaction']
            if inspectah_no_redaction | bool else [])

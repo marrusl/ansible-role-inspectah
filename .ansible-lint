@@ -7,6 +7,12 @@ exclude_paths:
   - .cache/
   - .superpowers/
 
+# The role's Galaxy name (inspectah) differs from the repo directory name
+# (ansible-role-inspectah). Mock the role so ansible-lint can resolve
+# references in examples/ and tests/ without requiring Galaxy installation.
+mock_roles:
+  - inspectah
+
 skip_list: []
 
 warn_list:

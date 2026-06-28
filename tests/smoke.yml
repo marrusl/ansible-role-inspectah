@@ -7,7 +7,7 @@
     _smoke_scan_output: "/tmp/inspectah-smoke-{{ ansible_hostname }}.tar.gz"
     _smoke_fetch_dest: "/tmp/inspectah-smoke-results"
   roles:
-    - role: ansible-role-inspectah
+    - role: inspectah
       vars:
         inspectah_scan_output: "{{ _smoke_scan_output }}"
         inspectah_fetch_dest: "{{ _smoke_fetch_dest }}"

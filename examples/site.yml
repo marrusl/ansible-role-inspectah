@@ -39,7 +39,7 @@
   vars:
     inspectah_campaign_id: "{{ hostvars['localhost'].inspectah_campaign_id }}"
   roles:
-    - role: ansible-role-inspectah
+    - role: inspectah
       vars:
         inspectah_install: true
         inspectah_install_method: copr

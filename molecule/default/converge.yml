@@ -8,4 +8,4 @@
     inspectah_campaign_id: "molecule-test"
     inspectah_cleanup_orphan_containers: true
   roles:
-    - role: ansible-role-inspectah
+    - role: inspectah

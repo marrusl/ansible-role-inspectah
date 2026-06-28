@@ -3,7 +3,7 @@
   hosts: all
   become: false
   roles:
-    - role: ansible-role-inspectah
+    - role: inspectah
       vars:
         inspectah_install: true
         inspectah_install_method: rpm
