@@ -31,4 +31,6 @@
     path: /tmp/inspectah.rpm
     state: absent
   become: true
-  when: inspectah_install_method == "rpm"
+  when:
+    - inspectah_install_method == "rpm"
+    - _inspectah_rpm_staged | default(false) | bool

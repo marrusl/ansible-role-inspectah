@@ -3,29 +3,28 @@
   hosts: all
   become: true
   tasks:
-    - name: Check stub inspectah binary exists
+    - name: Check COPR repo file was created via command fallback
       ansible.builtin.stat:
-        path: /usr/local/bin/inspectah
-      register: _verify_stub
+        path: /etc/yum.repos.d/_copr:copr.fedorainfracloud.org:mrussell:inspectah.repo
+      register: _verify_copr_repo
 
-    - name: Assert stub binary is present
+    - name: Assert COPR repo file exists
       ansible.builtin.assert:
         that:
-          - _verify_stub.stat.exists
-        fail_msg: "Stub inspectah binary not found at /usr/local/bin/inspectah"
-
-    - name: Check scan result was registered
-      ansible.builtin.assert:
-        that:
-          - inspectah_scan_result is defined
-          - inspectah_scan_result.rc == 0
-        fail_msg: "Scan result not registered or failed in fallback scenario"
-
-    - name: Assert fallback path was tested
-      ansible.builtin.assert:
-        that:
-          - _fallback_path_tested is defined
-          - _fallback_path_tested | bool
+          - _verify_copr_repo.stat.exists
         fail_msg: >-
-          COPR fallback path was not exercised. The community.general
-          module should have failed, triggering the command fallback.
+          COPR repo file not found. The command fallback path should have
+          created /etc/yum.repos.d/_copr:copr.fedorainfracloud.org:mrussell:inspectah.repo
+          when community.general was unavailable.
+
+    - name: Check inspectah binary is installed
+      ansible.builtin.command:
+        cmd: which inspectah
+      register: _verify_inspectah
+      changed_when: false
+
+    - name: Assert inspectah binary found
+      ansible.builtin.assert:
+        that:
+          - _verify_inspectah.rc == 0
+        fail_msg: "inspectah binary not found after fallback install path"

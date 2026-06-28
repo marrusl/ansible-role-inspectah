@@ -17,6 +17,7 @@ jobs:
           - default
           - air_gapped
           - fallback
+          - serial
         ansible-version:
           - "2.14"
           - "2.15"

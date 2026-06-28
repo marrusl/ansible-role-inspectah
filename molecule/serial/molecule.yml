@@ -4,7 +4,17 @@ dependency:
 driver:
   name: podman
 platforms:
-  - name: inspectah-test-el9
+  - name: inspectah-serial-1
+    image: registry.access.redhat.com/ubi9/ubi:latest
+    command: /usr/sbin/init
+    privileged: true
+    pre_build_image: true
+  - name: inspectah-serial-2
+    image: registry.access.redhat.com/ubi9/ubi:latest
+    command: /usr/sbin/init
+    privileged: true
+    pre_build_image: true
+  - name: inspectah-serial-3
     image: registry.access.redhat.com/ubi9/ubi:latest
     command: /usr/sbin/init
     privileged: true

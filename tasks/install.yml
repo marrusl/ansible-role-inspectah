@@ -55,6 +55,12 @@
         dest: /tmp/inspectah.rpm
         mode: "0644"
       become: true
+      register: _inspectah_rpm_copy
+
+    - name: Record RPM staging for cleanup tracking  # noqa: no-handler
+      ansible.builtin.set_fact:
+        _inspectah_rpm_staged: true
+      when: _inspectah_rpm_copy is changed
 
     - name: Install inspectah from local RPM
       ansible.builtin.dnf:

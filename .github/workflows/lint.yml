@@ -39,3 +39,5 @@ jobs:
             echo "Checking ${playbook}..."
             ansible-playbook "${playbook}" --syntax-check -i examples/inventory.ini
           done
+        env:
+          ANSIBLE_ROLES_PATH: ".roles"

@@ -1,0 +1,53 @@
+---
+- name: Verify serial-batch campaign integrity
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Check campaign directory exists
+      ansible.builtin.stat:
+        path: "{{ playbook_dir }}/scans/serial-batch-test"
+      register: _verify_campaign_dir
+
+    - name: Assert campaign directory exists
+      ansible.builtin.assert:
+        that:
+          - _verify_campaign_dir.stat.exists
+          - _verify_campaign_dir.stat.isdir
+        fail_msg: >-
+          Campaign directory not found at scans/serial-batch-test.
+          The three-play campaign-ID pattern may not have propagated
+          across serial batches.
+
+    - name: Find tarballs in campaign directory
+      ansible.builtin.find:
+        paths: "{{ playbook_dir }}/scans/serial-batch-test"
+        patterns: "*.tar.gz"
+      register: _verify_tarballs
+
+    - name: Assert all 3 hosts produced tarballs in one campaign directory
+      ansible.builtin.assert:
+        that:
+          - _verify_tarballs.matched == 3
+        fail_msg: >-
+          Expected 3 tarballs in scans/serial-batch-test/ (one per host),
+          found {{ _verify_tarballs.matched }}. Serial batching may have
+          split tarballs across multiple campaign directories.
+
+    - name: Verify each expected tarball exists
+      ansible.builtin.stat:
+        path: "{{ playbook_dir }}/scans/serial-batch-test/{{ item }}.tar.gz"
+      register: _verify_individual
+      loop:
+        - inspectah-serial-1
+        - inspectah-serial-2
+        - inspectah-serial-3
+
+    - name: Assert all individual tarballs present
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+        fail_msg: >-
+          Tarball {{ item.item }}.tar.gz missing from campaign directory.
+      loop: "{{ _verify_individual.results }}"
+      loop_control:
+        label: "{{ item.item }}.tar.gz"

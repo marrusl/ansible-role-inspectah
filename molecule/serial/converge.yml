@@ -1,0 +1,39 @@
+---
+# Three-play serial-batch converge.
+# Proves that the campaign-ID pattern works with serial batching:
+# one campaign directory, tarballs from all hosts across batches.
+
+# Play 0: Generate campaign ID (truly once, before serial batching)
+- name: Initialize campaign
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Generate campaign ID
+      ansible.builtin.set_fact:
+        inspectah_campaign_id: "serial-batch-test"
+
+# Play 1: Scan with serial batching (3 hosts, serial: 2 = 2 batches)
+- name: Scan fleet hosts (serial batched)
+  hosts: all
+  serial: 2
+  become: false
+  vars:
+    inspectah_campaign_id: "{{ hostvars['localhost'].inspectah_campaign_id }}"
+  roles:
+    - role: inspectah
+
+# Play 2: Verify campaign directory on control node
+- name: Verify campaign directory
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: List campaign directory contents
+      ansible.builtin.find:
+        paths: "{{ playbook_dir }}/scans/serial-batch-test"
+        patterns: "*.tar.gz"
+      register: _campaign_tarballs
+
+    - name: Record tarball count for verify play
+      ansible.builtin.set_fact:
+        _serial_tarball_count: "{{ _campaign_tarballs.matched }}"
+        _serial_tarball_files: "{{ _campaign_tarballs.files | map(attribute='path') | list }}"

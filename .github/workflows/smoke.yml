@@ -61,3 +61,4 @@ jobs:
             -e inspectah_install_method=copr
         env:
           ANSIBLE_FORCE_COLOR: "true"
+          ANSIBLE_ROLES_PATH: ".roles"
