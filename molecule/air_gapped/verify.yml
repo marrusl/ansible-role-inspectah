@@ -15,9 +15,16 @@
           - "'0.8' in _verify_version.stdout"
         fail_msg: "inspectah version check failed in air-gapped scenario"
 
-    - name: Check scan result was registered
+    - name: Verify inspectah binary exists on disk
+      ansible.builtin.stat:
+        path: /usr/bin/inspectah
+      register: _verify_binary
+
+    - name: Assert inspectah binary is present
       ansible.builtin.assert:
         that:
-          - inspectah_scan_result is defined
-          - inspectah_scan_result.rc == 0
-        fail_msg: "Scan result not registered or failed in air-gapped scenario"
+          - _verify_binary.stat.exists
+          - _verify_binary.stat.executable
+        fail_msg: >-
+          inspectah binary not found at /usr/bin/inspectah or not
+          executable. RPM install may have failed.

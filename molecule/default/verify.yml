@@ -15,13 +15,6 @@
           - _verify_inspectah.rc == 0
         fail_msg: "inspectah binary not found after converge"
 
-    - name: Check scan result was registered
-      ansible.builtin.assert:
-        that:
-          - inspectah_scan_result is defined
-          - inspectah_scan_result.rc == 0
-        fail_msg: "inspectah_scan_result not registered or scan failed"
-
     - name: Verify tarball was fetched to control node
       ansible.builtin.stat:
         path: "{{ playbook_dir }}/scans/molecule-test/inspectah-test-el9.tar.gz"

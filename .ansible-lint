@@ -6,6 +6,7 @@ exclude_paths:
   - molecule/
   - .cache/
   - .superpowers/
+  - .roles/
 
 # The role's Galaxy name (inspectah) differs from the repo directory name
 # (ansible-role-inspectah). Mock the role so ansible-lint can resolve
