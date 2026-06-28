@@ -1,1 +1,19 @@
 ---
+- name: Install inspectah
+  ansible.builtin.include_tasks: install.yml
+  when: inspectah_install | bool
+
+- name: Preflight checks
+  ansible.builtin.include_tasks: preflight.yml
+
+- name: Run inspectah scan
+  ansible.builtin.include_tasks: scan.yml
+
+- name: Fetch scan tarball to control node
+  ansible.builtin.include_tasks: fetch.yml
+
+- name: Clean up host (uninstall inspectah)
+  ansible.builtin.include_tasks: host_cleanup.yml
+  when:
+    - inspectah_cleanup_host | bool
+    - inspectah_install | bool
